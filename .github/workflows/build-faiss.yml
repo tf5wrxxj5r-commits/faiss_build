@@ -110,17 +110,18 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install dependencies (Windows)
+      - name: Install vcpkg and deps (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          rem Resolve VCPKG_ROOT
-          if not defined VCPKG_ROOT set VCPKG_ROOT=C:\vcpkg
-          if not exist "%VCPKG_ROOT%\vcpkg.exe" if defined VCPKG_INSTALLATION_ROOT set VCPKG_ROOT=%VCPKG_INSTALLATION_ROOT%
-          echo Using VCPKG_ROOT=%VCPKG_ROOT%
-
+          set VCPKG_ROOT=C:\vcpkg
+          if not exist "%VCPKG_ROOT%" (
+            git clone --depth 1 https://github.com/microsoft/vcpkg "%VCPKG_ROOT%"
+          )
+          call "%VCPKG_ROOT%\bootstrap-vcpkg.bat"
           "%VCPKG_ROOT%\vcpkg.exe" install "openblas[lapack]:x64-windows-static" "lapack-reference:x64-windows-static"
           "%VCPKG_ROOT%\vcpkg.exe" list
+          dir "%VCPKG_ROOT%\installed\x64-windows-static\lib"
 
       # ── Build FAISS ──
 
@@ -181,11 +182,7 @@ jobs:
         working-directory: faiss-src
         shell: cmd
         run: |
-          rem Resolve VCPKG_ROOT
-          if not defined VCPKG_ROOT set VCPKG_ROOT=C:\vcpkg
-          if not exist "%VCPKG_ROOT%\vcpkg.exe" if defined VCPKG_INSTALLATION_ROOT set VCPKG_ROOT=%VCPKG_INSTALLATION_ROOT%
-          echo Using VCPKG_ROOT=%VCPKG_ROOT%
-
+          set VCPKG_ROOT=C:\vcpkg
           set LAPACK_LIBS=%VCPKG_ROOT%\installed\x64-windows-static\lib\openblas.lib;%VCPKG_ROOT%\installed\x64-windows-static\lib\lapack.lib
 
           cmake -B build ^
