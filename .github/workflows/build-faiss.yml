@@ -112,9 +112,15 @@ jobs:
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: |
-          vcpkg install openblas:x64-windows-static lapack-reference:x64-windows-static
         shell: cmd
+        run: |
+          rem Resolve VCPKG_ROOT
+          if not defined VCPKG_ROOT set VCPKG_ROOT=C:\vcpkg
+          if not exist "%VCPKG_ROOT%\vcpkg.exe" if defined VCPKG_INSTALLATION_ROOT set VCPKG_ROOT=%VCPKG_INSTALLATION_ROOT%
+          echo Using VCPKG_ROOT=%VCPKG_ROOT%
+
+          "%VCPKG_ROOT%\vcpkg.exe" install "openblas[lapack]:x64-windows-static" "lapack-reference:x64-windows-static"
+          "%VCPKG_ROOT%\vcpkg.exe" list
 
       # ── Build FAISS ──
 
@@ -175,6 +181,13 @@ jobs:
         working-directory: faiss-src
         shell: cmd
         run: |
+          rem Resolve VCPKG_ROOT
+          if not defined VCPKG_ROOT set VCPKG_ROOT=C:\vcpkg
+          if not exist "%VCPKG_ROOT%\vcpkg.exe" if defined VCPKG_INSTALLATION_ROOT set VCPKG_ROOT=%VCPKG_INSTALLATION_ROOT%
+          echo Using VCPKG_ROOT=%VCPKG_ROOT%
+
+          set LAPACK_LIBS=%VCPKG_ROOT%\installed\x64-windows-static\lib\openblas.lib;%VCPKG_ROOT%\installed\x64-windows-static\lib\lapack.lib
+
           cmake -B build ^
             -DFAISS_ENABLE_GPU=OFF ^
             -DFAISS_ENABLE_PYTHON=OFF ^
@@ -186,8 +199,9 @@ jobs:
             -DBUILD_TESTING=OFF ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}\faiss-install ^
-            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_INSTALLATION_ROOT%\scripts\buildsystems\vcpkg.cmake ^
+            -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
             -DVCPKG_TARGET_TRIPLET=x64-windows-static ^
+            -DLAPACK_LIBRARIES="%LAPACK_LIBS%" ^
             ${{ matrix.cmake_extra }}
 
           cmake --build build --config Release -j %NUMBER_OF_PROCESSORS%
@@ -317,7 +331,7 @@ jobs:
 
   # ════════════════════════════════════════════
   #  Release: Create GitHub Release on v* tags
-  # ════════════════════════════════════════���═══
+  # ════════════════════════════════════════════
   release:
     name: Create Release
     needs: [build, verify]
