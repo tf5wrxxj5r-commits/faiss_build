@@ -119,7 +119,7 @@ jobs:
             git clone --depth 1 https://github.com/microsoft/vcpkg "%VCPKG_ROOT%"
           )
           call "%VCPKG_ROOT%\bootstrap-vcpkg.bat"
-          "%VCPKG_ROOT%\vcpkg.exe" install "openblas[lapack]:x64-windows-static" "lapack-reference:x64-windows-static"
+          "%VCPKG_ROOT%\vcpkg.exe" install "openblas:x64-windows-static" "lapack-reference:x64-windows-static"
           "%VCPKG_ROOT%\vcpkg.exe" list
           dir "%VCPKG_ROOT%\installed\x64-windows-static\lib"
 
