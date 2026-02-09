@@ -30,9 +30,10 @@ jobs:
             cmake_extra: ""
             lib_ext: a
             shared_ext: dylib
+            homebrew_prefix: /opt/homebrew
 
           - target: darwin-amd64
-            runner: macos-13
+            runner: macos-15-intel
             goos: darwin
             goarch: amd64
             os_name: darwin
@@ -41,6 +42,7 @@ jobs:
             cmake_extra: ""
             lib_ext: a
             shared_ext: dylib
+            homebrew_prefix: /usr/local
 
           - target: linux-amd64
             runner: ubuntu-latest
@@ -52,6 +54,7 @@ jobs:
             cmake_extra: ""
             lib_ext: a
             shared_ext: so
+            homebrew_prefix: ""
 
           - target: linux-arm64
             runner: ubuntu-22.04-arm64
@@ -63,6 +66,7 @@ jobs:
             cmake_extra: ""
             lib_ext: a
             shared_ext: so
+            homebrew_prefix: ""
 
           - target: windows-amd64
             runner: windows-latest
@@ -74,6 +78,7 @@ jobs:
             cmake_extra: ""
             lib_ext: lib
             shared_ext: dll
+            homebrew_prefix: ""
 
     steps:
       - name: Checkout repository
@@ -82,6 +87,8 @@ jobs:
       - name: Clone blevesearch/faiss
         run: |
           git clone --depth 1 --branch ${{ env.FAISS_BRANCH }} ${{ env.FAISS_REPO }} faiss-src
+
+      # ── Install dependencies ──
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -109,8 +116,42 @@ jobs:
           vcpkg install openblas:x64-windows-static
         shell: cmd
 
-      - name: Build FAISS (Unix)
-        if: runner.os != 'Windows'
+      # ── Build FAISS ──
+
+      - name: Build FAISS (macOS)
+        if: runner.os == 'macOS'
+        working-directory: faiss-src
+        env:
+          OpenMP_ROOT: ${{ matrix.homebrew_prefix }}/opt/libomp
+          LDFLAGS: "-L${{ matrix.homebrew_prefix }}/opt/libomp/lib"
+          CPPFLAGS: "-I${{ matrix.homebrew_prefix }}/opt/libomp/include"
+          CXXFLAGS: "-Xpreprocessor -fopenmp -I${{ matrix.homebrew_prefix }}/opt/libomp/include"
+        run: |
+          cmake -B build \
+            -DFAISS_ENABLE_GPU=OFF \
+            -DFAISS_ENABLE_PYTHON=OFF \
+            -DFAISS_ENABLE_C_API=ON \
+            -DFAISS_ENABLE_EXTRAS=OFF \
+            -DFAISS_ENABLE_MKL=OFF \
+            -DFAISS_OPT_LEVEL=${{ matrix.opt_level }} \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/faiss-install \
+            -DCMAKE_PREFIX_PATH="${{ matrix.homebrew_prefix }}/opt/libomp;${{ matrix.homebrew_prefix }}/opt/openblas" \
+            -DOpenMP_ROOT=${{ matrix.homebrew_prefix }}/opt/libomp \
+            -DOpenMP_C_FLAGS="-Xpreprocessor -fopenmp" \
+            -DOpenMP_CXX_FLAGS="-Xpreprocessor -fopenmp" \
+            -DOpenMP_C_LIB_NAMES="omp" \
+            -DOpenMP_CXX_LIB_NAMES="omp" \
+            -DOpenMP_omp_LIBRARY=${{ matrix.homebrew_prefix }}/opt/libomp/lib/libomp.dylib \
+            ${{ matrix.cmake_extra }}
+
+          cmake --build build --config Release -j $(sysctl -n hw.ncpu)
+          cmake --install build --config Release
+
+      - name: Build FAISS (Linux)
+        if: runner.os == 'Linux'
         working-directory: faiss-src
         run: |
           cmake -B build \
@@ -126,7 +167,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/faiss-install \
             ${{ matrix.cmake_extra }}
 
-          cmake --build build --config Release -j $(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cmake --build build --config Release -j $(nproc)
           cmake --install build --config Release
 
       - name: Build FAISS (Windows)
@@ -152,6 +193,8 @@ jobs:
           cmake --build build --config Release -j %NUMBER_OF_PROCESSORS%
           cmake --install build --config Release
 
+      # ── Verify build output ──
+
       - name: Verify build output (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -171,6 +214,8 @@ jobs:
           Write-Host "=== Installed headers ==="
           Get-ChildItem -Recurse "${{ github.workspace }}\faiss-install" -Include *.h | ForEach-Object { $_.FullName }
 
+      # ── Package artifacts ──
+
       - name: Package artifacts (Unix)
         if: runner.os != 'Windows'
         run: |
@@ -184,6 +229,8 @@ jobs:
           Compress-Archive -Path "${{ github.workspace }}\faiss-install\*" `
             -DestinationPath "${{ github.workspace }}\faiss-${{ matrix.target }}.zip"
 
+      # ── Upload artifacts ──
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -193,6 +240,9 @@ jobs:
             faiss-*.zip
           retention-days: 30
 
+  # ════════════════════════════════════════════
+  #  Verify: CGO linking test with go-faiss
+  # ════════════════════════════════════════════
   verify:
     name: Verify go-faiss link - ${{ matrix.target }}
     needs: build
@@ -204,7 +254,7 @@ jobs:
           - target: darwin-arm64
             runner: macos-14
           - target: darwin-amd64
-            runner: macos-13
+            runner: macos-15-intel
           - target: linux-amd64
             runner: ubuntu-latest
           - target: linux-arm64
@@ -265,6 +315,9 @@ jobs:
           go build -v -o test-faiss .
           echo "CGO linking succeeded for ${{ matrix.target }}"
 
+  # ════════════════════════════════════════════
+  #  Release: Create GitHub Release on v* tags
+  # ════════════════════════════════════════════
   release:
     name: Create Release
     needs: [build, verify]
