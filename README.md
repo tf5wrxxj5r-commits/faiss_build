@@ -1,1 +1,2 @@
 # faiss_build
+init
