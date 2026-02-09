@@ -75,7 +75,7 @@ jobs:
             os_name: windows
             arch_name: amd64
             opt_level: avx2
-            cmake_extra: ""
+            cmake_extra: "-DBLA_STATIC=ON -DBLA_VENDOR=OpenBLAS"
             lib_ext: lib
             shared_ext: dll
             homebrew_prefix: ""
@@ -113,7 +113,7 @@ jobs:
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
-          vcpkg install openblas:x64-windows-static
+          vcpkg install openblas:x64-windows-static lapack-reference:x64-windows-static
         shell: cmd
 
       # ── Build FAISS ──
@@ -317,7 +317,7 @@ jobs:
 
   # ════════════════════════════════════════════
   #  Release: Create GitHub Release on v* tags
-  # ════════════════════════════════════════════
+  # ════════════════════════════════════════���═══
   release:
     name: Create Release
     needs: [build, verify]
