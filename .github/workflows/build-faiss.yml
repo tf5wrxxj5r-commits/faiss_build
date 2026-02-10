@@ -273,7 +273,7 @@ jobs:
           - target: linux-amd64
             runner: ubuntu-latest
           - target: linux-arm64
-            runner: ubuntu-22.04-arm64
+            runner: ubuntu-22.04
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
