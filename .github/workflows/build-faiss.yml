@@ -275,6 +275,9 @@ jobs:
           - target: linux-arm64
             runner: ubuntu-22.04
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -309,7 +312,8 @@ jobs:
         run: |
           mkdir -p test-link && cd test-link
           go mod init test-link
-          go get github.com/blevesearch/go-faiss@latest
+          # IMPORTANT: pin go-faiss version to match FAISS_REF's C API to avoid missing symbols
+          go get github.com/blevesearch/go-faiss@v1.0.26
           cat > main.go << 'EOF'
           package main
 
