@@ -57,7 +57,7 @@ jobs:
             homebrew_prefix: ""
 
           - target: linux-arm64
-            runner: ubuntu-22.04-arm64
+            runner: ubuntu-22.04
             goos: linux
             goarch: arm64
             os_name: linux
