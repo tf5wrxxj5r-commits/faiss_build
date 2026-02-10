@@ -10,7 +10,9 @@ on:
 
 env:
   FAISS_REPO: https://github.com/blevesearch/faiss.git
-  FAISS_BRANCH: bleve
+  # bleve v2.5.5~v2.5.7 需要 blevesearch/faiss@8a59a0c (modified v1.12.0)
+  # 参考: docs/bleve/docs/vectors.md 版本对照表
+  FAISS_REF: 8a59a0c552fa2d14fa871f6b6bc793de1d277f5e
 
 jobs:
   build:
@@ -86,7 +88,9 @@ jobs:
 
       - name: Clone blevesearch/faiss
         run: |
-          git clone --depth 1 --branch ${{ env.FAISS_BRANCH }} ${{ env.FAISS_REPO }} faiss-src
+          git clone ${{ env.FAISS_REPO }} faiss-src
+          cd faiss-src
+          git checkout ${{ env.FAISS_REF }}
 
       # ── Install dependencies ──
 
